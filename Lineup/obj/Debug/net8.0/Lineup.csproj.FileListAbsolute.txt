@@ -1,0 +1,14 @@
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/bin/Debug/net8.0/Lineup
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/bin/Debug/net8.0/Lineup.deps.json
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/bin/Debug/net8.0/Lineup.runtimeconfig.json
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/bin/Debug/net8.0/Lineup.dll
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/bin/Debug/net8.0/Lineup.pdb
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.GeneratedMSBuildEditorConfig.editorconfig
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.AssemblyInfoInputs.cache
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.AssemblyInfo.cs
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.csproj.CoreCompileInputs.cache
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.dll
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/refint/Lineup.dll
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.pdb
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/Lineup.genruntimeconfig.cache
+/Users/ruimingzhu/Documents/qutGithub/IFN584-assignment1/Lineup/obj/Debug/net8.0/ref/Lineup.dll
