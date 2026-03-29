@@ -42,7 +42,7 @@ public class Board
     public bool IsColumnFull(int column)
     {
         var columnIndex = ColumnToIndex(column);
-        return cells[Rows - 1, columnIndex].HasValue;
+        return cells[0, columnIndex].HasValue;
     }
 
     public bool IsFull
@@ -66,11 +66,11 @@ public class Board
     {
         var columnIndex = ColumnToIndex(column);
 
-        for (var rowIndex = 0; rowIndex < Rows; rowIndex++)
+        for (var rowIndex = Rows-1; rowIndex >= 0; rowIndex--)
         {
             if (!cells[rowIndex, columnIndex].HasValue)
             {
-                return rowIndex + 1;
+                return Rows - rowIndex;
             }
         }
 
@@ -110,19 +110,27 @@ public class Board
     public void CollapseColumn(int column)
     {
         var columnIndex = ColumnToIndex(column);
-        int targetRow = Rows - 1;
+        var discs = new List<char>();
 
-        for(int i=Rows-1; i >= 0; i++)
+        for (int row = 0; row < Rows; row++)
         {
-            if (cells[i, columnIndex].HasValue)
+            if (cells[row, columnIndex].HasValue)
             {
-                char? temp=cells[targetRow,columnIndex];
-                cells[targetRow, columnIndex] = cells[i, columnIndex];
-                cells[i, columnIndex] = temp;
-                targetRow--;
+                discs.Add(cells[row, columnIndex]!.Value);
             }
         }
 
+        for (int row = 0; row < Rows; row++)
+        {
+            cells[row, columnIndex] = null;
+        }
+
+        var targetRow = Rows - 1;
+        foreach (var disc in discs)
+        {
+            cells[targetRow, columnIndex] = disc;
+            targetRow--;
+        }
     }
 
     public void CollapseAllColumns()
@@ -140,7 +148,7 @@ public class Board
             throw new ArgumentOutOfRangeException(nameof(row), $"Row must be between 1 and {Rows}.");
         }
 
-        return (row - 1, ColumnToIndex(column));
+        return (Rows-row, ColumnToIndex(column));
     }
 
     public string Render()
