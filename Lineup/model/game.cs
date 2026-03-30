@@ -5,80 +5,38 @@ public class Game
     private readonly Random random;
     private readonly DiscType[] enabledSpecialDiscTypes;
     private readonly GameConsoleUi ui;
+    private readonly Board board;
+    private readonly Player player1;
+    private readonly Player player2;
+    private readonly GameRules rules;
+    private readonly int winningLength;
 
-    private Board? board;
-    private Player? player1;
-    private Player? player2;
-    private Player? currentPlayer;
-    private GameRules? rules;
-    private int winningLength;
+    private Player currentPlayer;
     private bool quitRequested;
     private bool renderBoardAtTurnStart;
 
-    public Game(Random? random = null, params DiscType[] enabledSpecialDiscTypes)
+    public Game(int rows, int columns, PlayerType playerTwoType, params DiscType[] enabledSpecialDiscTypes)
     {
-        this.random = random ?? new Random();
-
-        if (enabledSpecialDiscTypes.Length == 0)
+        if (rows < 6)
         {
-            this.enabledSpecialDiscTypes = new[] { DiscType.Boring, DiscType.Magnetic };
-        }
-        else
-        {
-            var normalized = enabledSpecialDiscTypes
-                .Where(type => type != DiscType.Ordinary)
-                .Distinct()
-                .ToArray();
-
-            if (normalized.Length != 2)
-            {
-                throw new ArgumentException("LineUp requires exactly two special disc types to be enabled.");
-            }
-
-            this.enabledSpecialDiscTypes = normalized;
+            throw new ArgumentOutOfRangeException(nameof(rows), "Rows must be at least 6.");
         }
 
+        if (columns < 7 || columns < rows)
+        {
+            throw new ArgumentOutOfRangeException(nameof(columns), $"Columns must be at least 7 and at least {rows}.");
+        }
+
+        random = new Random();
+        this.enabledSpecialDiscTypes = NormalizeSpecialDiscTypes(enabledSpecialDiscTypes);
         ui = new GameConsoleUi(this.enabledSpecialDiscTypes);
-    }
-
-    private Board CurrentBoard => board ?? throw new InvalidOperationException("Game has not been initialized.");
-    private Player PlayerOne => player1 ?? throw new InvalidOperationException("Player 1 has not been initialized.");
-    private Player PlayerTwo => player2 ?? throw new InvalidOperationException("Player 2 has not been initialized.");
-    private Player CurrentPlayer => currentPlayer ?? throw new InvalidOperationException("Current player has not been initialized.");
-    private GameRules Rules => rules ?? throw new InvalidOperationException("Game rules have not been initialized.");
-
-    public void Run()
-    {
-        ui.ShowWelcome();
-
-        while (true)
-        {
-            if (ui.PromptForMainMenuSelection() == MainMenuSelection.Quit)
-            {
-                return;
-            }
-
-            SetupNewGame();
-            PlayGame();
-        }
-    }
-
-    private void SetupNewGame()
-    {
-        ui.ShowSetupHeader();
-
-        var playerTwoType = ui.PromptForGameMode();
-        var rows = ui.PromptForInt("Rows (minimum 6): ", value => value >= 6);
-        var columns = ui.PromptForInt(
-            $"Columns (minimum 7 and at least {rows}): ",
-            value => value >= 7 && value >= rows);
 
         board = new Board(rows, columns);
         winningLength = DetermineWinningLength(rows, columns);
         rules = new GameRules(winningLength);
 
         var discsPerPlayer = rows * columns / 2;
-        var specialDiscCount = enabledSpecialDiscTypes.Length * 2;
+        var specialDiscCount = this.enabledSpecialDiscTypes.Length * 2;
         var ordinaryDiscCount = discsPerPlayer - specialDiscCount;
 
         if (ordinaryDiscCount < 0)
@@ -96,11 +54,35 @@ public class Game
         currentPlayer = player1;
         quitRequested = false;
         renderBoardAtTurnStart = false;
-
-        ui.ShowGameSetup(CurrentBoard, winningLength, enabledSpecialDiscTypes);
     }
 
-    private int DetermineWinningLength(int rows, int columns)
+    public void Run()
+    {
+        ui.ShowGameSetup(board, winningLength, enabledSpecialDiscTypes);
+        PlayGame();
+    }
+
+    private static DiscType[] NormalizeSpecialDiscTypes(DiscType[] enabledSpecialDiscTypes)
+    {
+        if (enabledSpecialDiscTypes.Length == 0)
+        {
+            return new[] { DiscType.Boring, DiscType.Magnetic };
+        }
+
+        var normalized = enabledSpecialDiscTypes
+            .Where(type => type != DiscType.Ordinary)
+            .Distinct()
+            .ToArray();
+
+        if (normalized.Length != 2)
+        {
+            throw new ArgumentException("LineUp requires exactly two special disc types to be enabled.");
+        }
+
+        return normalized;
+    }
+
+    private static int DetermineWinningLength(int rows, int columns)
     {
         if (rows == 6 && columns == 7)
         {
@@ -127,12 +109,12 @@ public class Game
     {
         while (!quitRequested)
         {
-            if (!Rules.HasAnyValidMove(CurrentBoard, CurrentPlayer, enabledSpecialDiscTypes))
+            if (!rules.HasAnyValidMove(board, currentPlayer, enabledSpecialDiscTypes))
             {
-                ui.ShowNoValidMoves(CurrentPlayer);
+                ui.ShowNoValidMoves(currentPlayer);
 
-                var opponent = GetOpponent(CurrentPlayer.Id);
-                if (!Rules.HasAnyValidMove(CurrentBoard, opponent, enabledSpecialDiscTypes))
+                var opponent = GetOpponent(currentPlayer.Id);
+                if (!rules.HasAnyValidMove(board, opponent, enabledSpecialDiscTypes))
                 {
                     ui.ShowNoMoreMovesTie();
                     return;
@@ -145,18 +127,18 @@ public class Game
 
             if (renderBoardAtTurnStart)
             {
-                ui.ShowBoard(CurrentBoard);
+                ui.ShowBoard(board);
             }
 
-            ui.ShowPlayerStatus(CurrentPlayer);
+            ui.ShowPlayerStatus(currentPlayer);
 
-            if (CurrentPlayer.IsComputer)
+            if (currentPlayer.IsComputer)
             {
-                PerformComputerTurn(CurrentPlayer);
+                PerformComputerTurn(currentPlayer);
             }
             else
             {
-                var movePlayed = HandleHumanTurn(CurrentPlayer);
+                var movePlayed = HandleHumanTurn(currentPlayer);
                 if (!movePlayed)
                 {
                     if (quitRequested)
@@ -168,19 +150,19 @@ public class Game
                 }
             }
 
-            if (Rules.HasWinner(CurrentBoard, CurrentPlayer.Id))
+            if (rules.HasWinner(board, currentPlayer.Id))
             {
-                ui.ShowWinner(CurrentBoard, CurrentPlayer);
+                ui.ShowWinner(board, currentPlayer);
                 return;
             }
 
-            if (CurrentBoard.IsFull)
+            if (board.IsFull)
             {
-                ui.ShowTie(CurrentBoard);
+                ui.ShowTie(board);
                 return;
             }
 
-            currentPlayer = GetOpponent(CurrentPlayer.Id);
+            currentPlayer = GetOpponent(currentPlayer.Id);
         }
     }
 
@@ -201,20 +183,20 @@ public class Game
                 continue;
             }
 
-            if (!Rules.IsValidColumn(CurrentBoard, command.Column))
+            if (!rules.IsValidColumn(board, command.Column))
             {
-                ui.ShowInvalidColumn(CurrentBoard.Columns);
+                ui.ShowInvalidColumn(board.Columns);
                 continue;
             }
 
-            if (CurrentBoard.IsColumnFull(command.Column))
+            if (board.IsColumnFull(command.Column))
             {
                 ui.ShowColumnFull(command.Column);
                 continue;
             }
 
-            var moveResult = Rules.ApplyMove(
-                CurrentBoard,
+            var moveResult = rules.ApplyMove(
+                board,
                 player,
                 command.DiscType,
                 command.Column,
@@ -229,14 +211,14 @@ public class Game
 
     private void PerformComputerTurn(Player player)
     {
-        var validMoves = Rules.GetValidMoves(CurrentBoard, player, enabledSpecialDiscTypes).ToList();
+        var validMoves = rules.GetValidMoves(board, player, enabledSpecialDiscTypes).ToList();
         if (validMoves.Count == 0)
         {
             quitRequested = true;
             return;
         }
 
-        var selectedMove = validMoves.FirstOrDefault(move => Rules.MoveWinsImmediately(CurrentBoard, player, move));
+        var selectedMove = validMoves.FirstOrDefault(move => rules.MoveWinsImmediately(board, player, move));
         if (selectedMove == default)
         {
             selectedMove = validMoves[random.Next(validMoves.Count)];
@@ -244,8 +226,8 @@ public class Game
 
         ui.ShowComputerMove(player, selectedMove);
 
-        var moveResult = Rules.ApplyMove(
-            CurrentBoard,
+        var moveResult = rules.ApplyMove(
+            board,
             player,
             selectedMove.DiscType,
             selectedMove.Column,
@@ -258,17 +240,17 @@ public class Game
 
     private Player GetOpponent(PlayerId playerId)
     {
-        return playerId == PlayerId.Player1 ? PlayerTwo : PlayerOne;
+        return playerId == PlayerId.Player1 ? player2 : player1;
     }
 
     private void ReturnDiscToOwner(Disc disc)
     {
         if (disc.Owner == PlayerId.Player1)
         {
-            PlayerOne.ReturnDisc(disc);
+            player1.ReturnDisc(disc);
             return;
         }
 
-        PlayerTwo.ReturnDisc(disc);
+        player2.ReturnDisc(disc);
     }
 }

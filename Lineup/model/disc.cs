@@ -39,7 +39,14 @@ public class Disc
             _ => throw new InvalidOperationException("Unknown disc.")
         };
 
-    public bool CountsForWin => Type != DiscType.Exploding;
+    //public bool CountsForWin => Type != DiscType.Exploding;
+    public bool CountsForWin
+    {
+        get
+        {
+            return Type != DiscType.Exploding;
+        }
+    }
 
     public bool IsSpecial => Type != DiscType.Ordinary;
 

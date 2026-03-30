@@ -55,7 +55,13 @@ public class Player
         ExplodingDiscsRemaining = explodingDiscCount;
     }
 
-    public bool IsComputer => Type == PlayerType.Computer;
+    public bool IsComputer
+    {
+        get
+        {
+            return Type == PlayerType.Computer;
+        }
+    } 
 
     public bool CanPlayDisc(DiscType discType)
     {

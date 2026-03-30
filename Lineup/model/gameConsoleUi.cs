@@ -80,6 +80,18 @@ internal class GameConsoleUi
         }
     }
 
+    public int PromptForRows()
+    {
+        return PromptForInt("Rows (minimum 6): ", value => value >= 6);
+    }
+
+    public int PromptForColumns(int rows)
+    {
+        return PromptForInt(
+            $"Columns (minimum 7 and at least {rows}): ",
+            value => value >= 7 && value >= rows);
+    }
+
     public int PromptForInt(string prompt, Func<int, bool> validator)
     {
         while (true)
