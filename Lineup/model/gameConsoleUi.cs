@@ -1,333 +1,323 @@
 namespace Lineup.Model;
 
-internal enum MainMenuSelection
+public class GameConsoleUi
 {
-    NewGame,
-    Quit
-}
+    // ==================== main menu ====================
 
-internal enum HumanTurnCommandKind
-{
-    Move,
-    Quit
-}
-
-internal readonly record struct HumanTurnCommand(HumanTurnCommandKind Kind, DiscType DiscType, int Column);
-
-internal class GameConsoleUi
-{
-    private readonly DiscType[] enabledSpecialDiscTypes;
-
-    public GameConsoleUi(IEnumerable<DiscType> enabledSpecialDiscTypes)
-    {
-        this.enabledSpecialDiscTypes = enabledSpecialDiscTypes.ToArray();
-    }
-
-    public void ShowWelcome()
-    {
-        Console.WriteLine("Welcome to LineUp.");
-    }
-
-    public MainMenuSelection PromptForMainMenuSelection()
+    /// display main menu（1=New, 2=Load, 3=Test, 4=Quit)
+    public int ShowMainMenu()
     {
         while (true)
         {
             Console.WriteLine();
-            Console.WriteLine("1. New game");
-            Console.WriteLine("2. Quit");
-
+            Console.WriteLine("--------------------------------");
+            Console.WriteLine("  LineUp - Main Menu");
+            Console.WriteLine("--------------------------------");
+            Console.WriteLine("  1. New Game");
+            Console.WriteLine("  2. Load Game");
+            Console.WriteLine("  3. Testing Mode");
+            Console.WriteLine("  4. Quit");
+            Console.WriteLine("--------------------------------");
             Console.Write("Select an option: ");
-            var input = ReadTrimmedInput();
 
-            if (input is "1" or "new")
-            {
-                return MainMenuSelection.NewGame;
-            }
+            string input = ReadInput();
+            if (int.TryParse(input, out int choice) && choice >= 1 && choice <= 4)
+                return choice;
 
-            if (input is "2" or "quit" or "q")
-            {
-                return MainMenuSelection.Quit;
-            }
-
-            Console.WriteLine("Invalid option. Enter 1 to start a new game or 2 to quit.");
+            Console.WriteLine("Invalid option. Please enter 1-4.");
         }
     }
 
-    public void ShowSetupHeader()
-    {
-        Console.WriteLine();
-        Console.WriteLine("Game setup");
-    }
+    // ==================== new game ====================
 
-    public PlayerType PromptForGameMode()
+    public PlayerType PromptGameMode()
     {
         while (true)
         {
+            Console.WriteLine();
+            Console.WriteLine("--------------------------------");
             Console.Write("Game mode (1 = Human vs Human, 2 = Human vs Computer): ");
-            var input = ReadTrimmedInput();
 
-            if (input is "1" or "hvh")
-            {
-                return PlayerType.Human;
-            }
+            string input = ReadInput();
+            if (input == "1") return PlayerType.Human;
+            if (input == "2") return PlayerType.Computer;
 
-            if (input is "2" or "hvc" or "ai")
-            {
-                return PlayerType.Computer;
-            }
-
-            Console.WriteLine("Invalid game mode. Enter 1 or 2.");
+            Console.WriteLine("Invalid option. Please enter 1 or 2.");
         }
     }
 
-    public int PromptForRows()
-    {
-        return PromptForInt("Rows (minimum 6): ", value => value >= 6);
-    }
-
-    public int PromptForColumns(int rows)
-    {
-        return PromptForInt(
-            $"Columns (minimum 7 and at least {rows}): ",
-            value => value >= 7 && value >= rows);
-    }
-
-    public int PromptForInt(string prompt, Func<int, bool> validator)
+    /// input rows
+    public int PromptRows()
     {
         while (true)
         {
-            Console.Write(prompt);
-            var input = ReadTrimmedInput();
-
-            if (int.TryParse(input, out var value) && validator(value))
-            {
-                return value;
-            }
-
-            Console.WriteLine("Invalid number.");
+            Console.Write("Enter number of rows (minimum 6): ");
+            string input = ReadInput();
+            if (int.TryParse(input, out int rows) && rows >= 6)
+                return rows;
+            Console.WriteLine("Invalid. Rows must be at least 6.");
         }
     }
 
-    public void ShowGameSetup(Board board, int winningLength, IReadOnlyCollection<DiscType> activeSpecialDiscTypes)
+    /// input columns
+    public int PromptColumns(int rows)
+    {
+        while (true)
+        {
+            Console.Write($"Enter number of columns (minimum 7, at least {rows}): ");
+            string input = ReadInput();
+            if (int.TryParse(input, out int cols) && cols >= 7 && cols >= rows)
+                return cols;
+            Console.WriteLine($"Invalid. Columns must be at least 7 and at least {rows}.");
+        }
+    }
+
+    // ==================== during game ====================
+
+    /// board size and win condition
+    public void ShowGameStart(Board board, int winningLength)
     {
         Console.WriteLine();
-        Console.WriteLine($"Board size: {board.Rows} x {board.Columns}");
-        Console.WriteLine($"Winning length: {winningLength}");
-        Console.WriteLine($"Enabled special discs: {string.Join(", ", activeSpecialDiscTypes)}");
-        Console.WriteLine();
+        Console.WriteLine("--------------------------------");
+        Console.WriteLine($"  Board: {board.Rows} x {board.Columns}");
+        Console.WriteLine($"  Win condition: {winningLength} in a row");
+        Console.WriteLine("--------------------------------");
         Console.WriteLine(board.Render());
     }
 
+    /// show board
     public void ShowBoard(Board board)
     {
         Console.WriteLine();
         Console.WriteLine(board.Render());
     }
 
-    public void ShowPlayerStatus(Player player)
+    /// show current turn and inventory
+    public void ShowPlayerTurn(Player player)
     {
-        var status = new List<string>
-        {
-            $"ordinary={player.OrdinaryDiscsRemaining}"
-        };
-
-        foreach (var specialType in enabledSpecialDiscTypes)
-        {
-            status.Add(specialType switch
-            {
-                DiscType.Boring => $"boring={player.BoringDiscsRemaining}",
-                DiscType.Magnetic => $"magnetic={player.MagneticDiscsRemaining}",
-                DiscType.Exploding => $"exploding={player.ExplodingDiscsRemaining}",
-                _ => string.Empty
-            });
-        }
-
-        Console.WriteLine($"{player.Name}'s turn ({string.Join(", ", status.Where(text => text.Length > 0))})");
-        Console.WriteLine($"Move format: {BuildMoveExamples()}");
+        Console.WriteLine("--------------------------------");
+        Console.Write($"{player.Name}'s turn  |  ");
+        Console.Write($"ordinary: {player.OrdinaryDiscsRemaining}");
+        Console.Write($", boring: {player.BoringDiscsRemaining}");
+        Console.Write($", magnetic: {player.MagneticDiscsRemaining}");
+        Console.WriteLine();
+        Console.WriteLine("--------------------------------");
     }
 
-    public HumanTurnCommand PromptForHumanTurn()
+    /// show special disc placement frame
+    public void ShowPlacementFrame(string discName, int col1based)
+    {
+        Console.WriteLine($"  {discName} placed in column {col1based}.");
+    }
+
+    /// show special disc effect frame
+    public void ShowEffectFrame(string effectMessage, Board board)
+    {
+        Console.WriteLine($"  {effectMessage}");
+        Console.WriteLine(board.Render());
+    }
+
+    /// show computer move
+    public void ShowComputerMove(string playerName, DiscType discType, int col1based)
+    {
+        Console.WriteLine($"{playerName} plays {discType} in column {col1based}.");
+    }
+
+    // ==================== human move input ====================
+
+    /// return TurnResult
+    /// format: "4"(normal)"b 4"（Boring col4）、"m 4"（Magnetic col4）
+    /// or save / help / quit
+    
+    public TurnResult PromptHumanMove()
     {
         while (true)
         {
-            Console.Write("Enter a move or command: ");
-            var input = ReadTrimmedInput();
+            Console.Write("Enter move (or help/save/quit): ");
+            string input = ReadInput();
 
             if (string.IsNullOrWhiteSpace(input))
             {
-                Console.WriteLine("Enter a column number or type 'help'.");
+                Console.WriteLine("Please enter a command. Type 'help' for options.");
                 continue;
             }
 
-            if (input is "help" or "h" or "?")
+            // options
+            if (input == "help" || input == "h" || input == "?")
             {
                 ShowHelp();
                 continue;
             }
+            if (input == "save" || input == "s")
+                return new TurnResult { Action = TurnAction.Save };
+            if (input == "quit" || input == "q" || input == "exit")
+                return new TurnResult { Action = TurnAction.Quit };
 
-            if (input is "quit" or "q" or "exit")
+            // parse move
+            if (TryParseMove(input, out DiscType discType, out int col0based))
             {
-                return new HumanTurnCommand(HumanTurnCommandKind.Quit, DiscType.Ordinary, 0);
+                return new TurnResult
+                {
+                    Action = TurnAction.Move,
+                    DiscType = discType,
+                    Column = col0based
+                };
             }
 
-            if (TryParseMove(input, out var discType, out var column))
-            {
-                return new HumanTurnCommand(HumanTurnCommandKind.Move, discType, column);
-            }
-
-            Console.WriteLine($"Invalid move. Example inputs: {BuildMoveExamples()}.");
+            Console.WriteLine("Invalid move. Examples: 4, b 4, m 4. Type 'help' for details.");
         }
     }
 
-    public void ShowNoDiscsRemaining(Player player, DiscType discType)
+    /// parse move input, return disc type and location
+    private bool TryParseMove(string input, out DiscType discType, out int col0based)
     {
-        Console.WriteLine($"{player.Name} has no {discType} discs remaining.");
-    }
+        discType = DiscType.Ordinary;
+        col0based = 0;
 
-    public void ShowInvalidColumn(int columns)
-    {
-        Console.WriteLine($"Column must be between 1 and {columns}.");
-    }
+        string[] parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-    public void ShowColumnFull(int column)
-    {
-        Console.WriteLine($"Column {column} is full.");
-    }
-
-    public void ShowComputerMove(Player player, MoveChoice move)
-    {
-        Console.WriteLine($"{player.Name} plays {move.DiscType} in column {move.Column}.");
-    }
-
-    public void ShowMoveFrames(IEnumerable<MoveFrame> frames)
-    {
-        foreach (var frame in frames)
+        if (parts.Length == 1)
         {
-            Console.WriteLine();
-            if (!string.IsNullOrWhiteSpace(frame.Message))
+            // pure number, means ordinary disc
+            if (int.TryParse(parts[0], out int col1))
             {
-                Console.WriteLine(frame.Message);
+                col0based = col1 - 1; // 1-based → 0-based
+                return true;
             }
-
-            Console.WriteLine(frame.BoardText);
+            return false;
         }
+
+        if (parts.Length == 2)
+        {
+            // "type column"
+            string typeStr = parts[0].ToLower();
+            if (!int.TryParse(parts[1], out int col2)) return false;
+
+            col0based = col2 - 1; // 1-based → 0-based
+
+            switch (typeStr)
+            {
+                case "o": case "ordinary":
+                    discType = DiscType.Ordinary; return true;
+                case "b": case "boring":
+                    discType = DiscType.Boring; return true;
+                case "m": case "magnetic":
+                    discType = DiscType.Magnetic; return true;
+                default:
+                    return false;
+            }
+        }
+
+        return false;
     }
 
-    public void ShowNoValidMoves(Player player)
+    // ==================== help ====================
+
+
+    public void ShowHelp()
     {
         Console.WriteLine();
-        Console.WriteLine($"{player.Name} has no valid moves.");
+        Console.WriteLine("--------------------------------");
+        Console.WriteLine("  Commands:");
+        Console.WriteLine("--------------------------------");
+        Console.WriteLine("  4          - play ordinary disc in column 4");
+        Console.WriteLine("  o 4        - play ordinary disc in column 4");
+        Console.WriteLine("  b 4        - play boring disc in column 4");
+        Console.WriteLine("  m 4        - play magnetic disc in column 4");
+        Console.WriteLine("  save       - save the current game");
+        Console.WriteLine("  help       - show this menu");
+        Console.WriteLine("  quit       - quit the game");
+        Console.WriteLine("--------------------------------");
     }
 
-    public void ShowNoMoreMovesTie()
+    // ==================== error ====================
+
+    public void ShowInvalidColumn(int maxCol1based)
     {
-        Console.WriteLine("No more moves are possible. The game ends in a tie.");
+        Console.WriteLine($"Invalid column. Please enter 1-{maxCol1based}.");
     }
 
-    public void ShowWinner(Board board, Player player)
+    public void ShowColumnFull(int col1based)
+    {
+        Console.WriteLine($"Column {col1based} is full. Choose another column.");
+    }
+
+    public void ShowNoDiscsRemaining(string playerName, DiscType discType)
+    {
+        Console.WriteLine($"{playerName} has no {discType} discs remaining.");
+    }
+
+    public void ShowError(string message)
+    {
+        Console.WriteLine($"Error: {message}");
+    }
+
+    // ==================== result ====================
+
+    public void ShowWinner(Board board, Player winner)
     {
         Console.WriteLine();
         Console.WriteLine(board.Render());
-        Console.WriteLine($"{player.Name} wins.");
+        Console.WriteLine("================================");
+        Console.WriteLine($"  {winner.Name} wins!");
+        Console.WriteLine("================================");
     }
 
     public void ShowTie(Board board)
     {
         Console.WriteLine();
         Console.WriteLine(board.Render());
-        Console.WriteLine("The game ends in a tie.");
+        Console.WriteLine("================================");
+        Console.WriteLine("  The game ends in a tie.");
+        Console.WriteLine("================================");
     }
 
-    private void ShowHelp()
+    public void ShowNoValidMoves(string playerName)
     {
-        Console.WriteLine();
-        Console.WriteLine("Commands");
-        Console.WriteLine("  4              play an ordinary disc in column 4");
-        Console.WriteLine("  o 4            play an ordinary disc in column 4");
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Boring))
-        {
-            Console.WriteLine("  b 4            play a boring disc in column 4");
-        }
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Magnetic))
-        {
-            Console.WriteLine("  m 4            play a magnetic disc in column 4");
-        }
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Exploding))
-        {
-            Console.WriteLine("  e 4            play an exploding disc in column 4");
-        }
-
-        Console.WriteLine("  help           show this menu");
-        Console.WriteLine("  quit           return to the main menu");
+        Console.WriteLine($"{playerName} has no valid moves. Skipping turn.");
     }
 
-    private string BuildMoveExamples()
+    // ==================== save and load ====================
+
+    public void ShowSaveSuccess(string filePath)
     {
-        var examples = new List<string> { "4", "o 4" };
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Boring))
-        {
-            examples.Add("b 4");
-        }
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Magnetic))
-        {
-            examples.Add("m 4");
-        }
-
-        if (enabledSpecialDiscTypes.Contains(DiscType.Exploding))
-        {
-            examples.Add("e 4");
-        }
-
-        return string.Join(", ", examples);
+        Console.WriteLine($"Game saved to: {filePath}");
     }
 
-    private bool TryParseMove(string input, out DiscType discType, out int column)
+    public string PromptLoadFilePath()
     {
-        discType = DiscType.Ordinary;
-        column = 0;
-
-        var parts = input
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (parts.Length == 1)
+        while (true)
         {
-            return int.TryParse(parts[0], out column);
+            Console.Write("Enter save file path (or 'cancel' to go back): ");
+            string input = ReadInput();
+            if (!string.IsNullOrWhiteSpace(input))
+                return input;
+            Console.WriteLine("Please enter a file path.");
         }
-
-        if (parts.Length != 2 || !TryParseDiscType(parts[0], out discType))
-        {
-            return false;
-        }
-
-        return int.TryParse(parts[1], out column);
     }
 
-    private bool TryParseDiscType(string token, out DiscType discType)
+    // ==================== testing mode ====================
+
+    public string PromptTestSequence()
     {
-        discType = token.ToLowerInvariant() switch
+        while (true)
         {
-            "o" or "ord" or "ordinary" => DiscType.Ordinary,
-            "b" or "boring" => DiscType.Boring,
-            "m" or "magnetic" => DiscType.Magnetic,
-            "e" or "exploding" => DiscType.Exploding,
-            _ => (DiscType)(-1)
-        };
-
-        if (discType == (DiscType)(-1))
-        {
-            return false;
+            Console.WriteLine();
+            Console.WriteLine("--------------------------------");
+            Console.WriteLine("  Testing Mode (6x7 board)");
+            Console.WriteLine("--------------------------------");
+            Console.Write("Enter move sequence (e.g. O4,O5,B3,M6): ");
+            string input = ReadInput();
+            if (!string.IsNullOrWhiteSpace(input))
+                return input;
+            Console.WriteLine("Sequence cannot be empty.");
         }
-
-        return discType == DiscType.Ordinary || enabledSpecialDiscTypes.Contains(discType);
     }
 
-    private static string ReadTrimmedInput()
+    // ==================== utils ====================
+
+    private static string ReadInput()
     {
-        return (Console.ReadLine() ?? string.Empty).Trim();
+        return (Console.ReadLine() ?? "").Trim();
     }
 }

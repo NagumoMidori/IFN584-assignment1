@@ -3,174 +3,118 @@ namespace Lineup.Model;
 public class Board
 {
     private readonly char?[,] cells;
+
     public int Rows { get; }
     public int Columns { get; }
 
-    public Board(int rows = 6, int columns = 7)
+    public Board(int rows, int columns)
     {
         if (rows < 6)
-        {
-            throw new ArgumentOutOfRangeException(nameof(rows), "Board must have at least 6 rows.");
-        }
-
+            throw new ArgumentOutOfRangeException(nameof(rows), "Rows must be at least 6.");
         if (columns < 7)
-        {
-            throw new ArgumentOutOfRangeException(nameof(columns), "Board must have at least 7 columns.");
-        }
-
+            throw new ArgumentOutOfRangeException(nameof(columns), "Columns must be at least 7.");
         if (rows > columns)
-        {
-            throw new ArgumentException("Board cannot have more rows than columns.");
-        }
+            throw new ArgumentException("Rows cannot exceed columns.");
 
         Rows = rows;
         Columns = columns;
         cells = new char?[rows, columns];
     }
 
-    private int ColumnToIndex(int column)
+    public char? GetCell(int row, int col)
     {
-        if (column < 1 || column > Columns)
-        {
-            throw new ArgumentOutOfRangeException(nameof(column), $"Column must be between 1 and {Columns}.");
-        }
-
-        return column - 1;
+        return cells[row, col];
     }
 
 
-    public bool IsColumnFull(int column)
+    public void SetCell(int row, int col, char? value)
     {
-        var columnIndex = ColumnToIndex(column);
-        return cells[0, columnIndex].HasValue;
+        cells[row, col] = value;
+    }
+
+
+    public void ClearCell(int row, int col)
+    {
+        cells[row, col] = null;
+    }
+
+    public int DropDisc(int col, char symbol)
+    {
+        for (int row = Rows - 1; row >= 0; row--)
+        {
+            if (!cells[row, col].HasValue)
+            {
+                cells[row, col] = symbol;
+                return row;
+            }
+        }
+        throw new InvalidOperationException($"Column {col} is full.");
+    }
+
+
+    public bool IsColumnFull(int col)
+    {
+        return cells[0, col].HasValue;
     }
 
     public bool IsFull
     {
         get
         {
-            for (var column = 1; column <= Columns; column++)
+            for (int col = 0; col < Columns; col++)
             {
-                if (!IsColumnFull(column))
-                {
+                if (!IsColumnFull(col))
                     return false;
-                }
             }
-
             return true;
         }
     }
 
-
-    public int? FindLocation(int column)
+    public void CollapseColumn(int col)
     {
-        var columnIndex = ColumnToIndex(column);
 
-        for (var rowIndex = Rows-1; rowIndex >= 0; rowIndex--)
-        {
-            if (!cells[rowIndex, columnIndex].HasValue)
-            {
-                return Rows - rowIndex;
-            }
-        }
-
-        return null;
-    }
-
-    public int DropDisc(int column, char disc)
-    {
-        var targetRow = FindLocation(column);
-
-        if (!targetRow.HasValue)
-        {
-            throw new InvalidOperationException($"Column {column} is full.");
-        }
-
-        SetCell(targetRow.Value, column, disc);
-        return targetRow.Value;
-    }
-
-    public char? GetCell(int row, int column)
-    {
-        var (rowIndex, columnIndex) = ToIndexes(row, column);
-        return cells[rowIndex, columnIndex];
-    }
-
-    public void SetCell(int row, int column, char? disc)
-    {
-        var (rowIndex, columnIndex) = ToIndexes(row, column);
-        cells[rowIndex, columnIndex] = disc;
-    }
-
-    public void ClearCell(int row, int column)
-    {
-        SetCell(row, column, null);
-    }
-
-    public void CollapseColumn(int column)
-    {
-        var columnIndex = ColumnToIndex(column);
         var discs = new List<char>();
-
-        for (int row = 0; row < Rows; row++)
+        for (int row = Rows - 1; row >= 0; row--)
         {
-            if (cells[row, columnIndex].HasValue)
+            if (cells[row, col].HasValue)
             {
-                discs.Add(cells[row, columnIndex]!.Value);
+                discs.Add(cells[row, col]!.Value);
             }
         }
 
+
         for (int row = 0; row < Rows; row++)
         {
-            cells[row, columnIndex] = null;
+            cells[row, col] = null;
         }
 
-        var targetRow = Rows - 1;
+
+        int targetRow = Rows - 1;
         foreach (var disc in discs)
         {
-            cells[targetRow, columnIndex] = disc;
+            cells[targetRow, col] = disc;
             targetRow--;
         }
     }
 
-    public void CollapseAllColumns()
-    {
-        for (var column = 1; column <= Columns; column++)
-        {
-            CollapseColumn(column);
-        }
-    }
-
-    private (int rowIndex, int columnIndex) ToIndexes(int row, int column)
-    {
-        if (row < 1 || row > Rows)
-        {
-            throw new ArgumentOutOfRangeException(nameof(row), $"Row must be between 1 and {Rows}.");
-        }
-
-        return (Rows-row, ColumnToIndex(column));
-    }
-
     public string Render()
     {
-        string result = "";
-        for(int row = 0; row < Rows; row++)
+        string consoleBoard = "";
+
+        for (int row = 0; row < Rows; row++)
         {
-            result += "|";
-            for(int column = 0; column < Columns; column++)
+            consoleBoard += "|";
+
+            for (int col = 0; col < Columns; col++)
             {
-                char? disc = cells[row, column];
-                if (disc.HasValue)
-                {
-                    result+=" " + disc.Value + " |";
-                }
-                else
-                {
-                    result += "   |";
-                }
+                char? cell = cells[row, col];
+                consoleBoard += cell.HasValue ? $" {cell.Value} |" : "   |";
             }
-            result += "\n";
+
+            if (row < Rows - 1)
+                consoleBoard += Environment.NewLine;
         }
-        return result;
+
+        return consoleBoard;
     }
 }

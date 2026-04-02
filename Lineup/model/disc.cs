@@ -1,78 +1,140 @@
 namespace Lineup.Model;
 
-public enum PlayerId
-{
-    Player1,
-    Player2
-}
 
-public enum DiscType
-{
-    Ordinary,
-    Boring,
-    Magnetic,
-    Exploding
-}
+public enum PlayerId { Player1, Player2 }
 
-public class Disc
-{
-    public PlayerId Owner { get; }
-    public DiscType Type { get; }
 
-    public Disc(PlayerId owner, DiscType type)
+public enum DiscType { Ordinary, Boring, Magnetic }
+
+
+public abstract class Disc
+{
+    private readonly PlayerId owner;
+    private readonly DiscType type;
+
+    protected Disc(PlayerId owner, DiscType type)
     {
-        Owner = owner;
-        Type = type;
+        this.owner = owner;
+        this.type = type;
     }
 
-    public char Symbol =>
-        (Owner, Type) switch
-        {
-            (PlayerId.Player1, DiscType.Ordinary) => '@',
-            (PlayerId.Player2, DiscType.Ordinary) => '#',
-            (PlayerId.Player1, DiscType.Boring) => 'B',
-            (PlayerId.Player2, DiscType.Boring) => 'b',
-            (PlayerId.Player1, DiscType.Magnetic) => 'M',
-            (PlayerId.Player2, DiscType.Magnetic) => 'm',
-            (PlayerId.Player1, DiscType.Exploding) => 'E',
-            (PlayerId.Player2, DiscType.Exploding) => 'e',
-            _ => throw new InvalidOperationException("Unknown disc.")
-        };
+    public PlayerId Owner => owner;
+    public DiscType Type => type;
 
-    //public bool CountsForWin => Type != DiscType.Exploding;
-    public bool CountsForWin
-    {
-        get
-        {
-            return Type != DiscType.Exploding;
-        }
-    }
 
-    public bool IsSpecial => Type != DiscType.Ordinary;
+    public abstract char Symbol { get; }
 
-    public Disc ToOrdinary()
-    {
-        return new Disc(Owner, DiscType.Ordinary);
-    }
+    public virtual bool CountsForWin => true;
 
+    /// <summary>
+    /// the disc effect when placed on the board:
+    /// OrdinaryDisc 无效果，BoringDisc/MagneticDisc needs override to implement
+    /// </summary>
+    /// <param name="board">board</param>
+    /// <param name="row">row</param>
+    /// <param name="col">column</param>
+    /// <param name="returnDisc">return disc callback</param>
+    public abstract void ApplyEffect(Board board, int row, int col, Action<Disc>? returnDisc);
+
+    /// <summary>
+    /// reconstruct a Disc instance from its symbol on the board (e.g. '@' → OrdinaryDisc(Player1))
+    /// </summary>
     public static Disc FromSymbol(char symbol)
     {
         return symbol switch
         {
-            '@' => new Disc(PlayerId.Player1, DiscType.Ordinary),
-            '#' => new Disc(PlayerId.Player2, DiscType.Ordinary),
-            'B' => new Disc(PlayerId.Player1, DiscType.Boring),
-            'b' => new Disc(PlayerId.Player2, DiscType.Boring),
-            'M' => new Disc(PlayerId.Player1, DiscType.Magnetic),
-            'm' => new Disc(PlayerId.Player2, DiscType.Magnetic),
-            'E' => new Disc(PlayerId.Player1, DiscType.Exploding),
-            'e' => new Disc(PlayerId.Player2, DiscType.Exploding),
-            _ => throw new ArgumentException($"Invalid disc symbol: {symbol}")
+            '@' => new OrdinaryDisc(PlayerId.Player1),
+            '#' => new OrdinaryDisc(PlayerId.Player2),
+            'B' => new BoringDisc(PlayerId.Player1),
+            'b' => new BoringDisc(PlayerId.Player2),
+            'M' => new MagneticDisc(PlayerId.Player1),
+            'm' => new MagneticDisc(PlayerId.Player2),
+            _ => throw new ArgumentException($"Unknown disc symbol: {symbol}")
         };
     }
+}
 
-    public static bool IsValidSymbol(char symbol)
+
+public class OrdinaryDisc : Disc
+{
+    public OrdinaryDisc(PlayerId owner) : base(owner, DiscType.Ordinary) { }
+
+    public override char Symbol => Owner == PlayerId.Player1 ? '@' : '#';
+
+    public override void ApplyEffect(Board board, int row, int col, Action<Disc>? returnDisc)
     {
-        return symbol is '@' or '#' or 'B' or 'b' or 'M' or 'm' or 'E' or 'e';
+        // no effect for ordinary disc
+    }
+}
+
+/// <summary>
+/// Boring disc: remove all other discs in the same column, then collapse the column so that the Boring disc falls to the bottom
+/// </summary>
+public class BoringDisc : Disc
+{
+    public BoringDisc(PlayerId owner) : base(owner, DiscType.Boring) { }
+
+    public override char Symbol => Owner == PlayerId.Player1 ? 'B' : 'b';
+
+    public override void ApplyEffect(Board board, int row, int col, Action<Disc>? returnDisc)
+    {
+        // remove all other discs in the same column (except the Boring disc just placed)
+        for (int r = 0; r < board.Rows; r++)
+        {
+            if (r == row) continue;
+
+            char? cell = board.GetCell(r, col);
+            if (cell.HasValue)
+            {
+                // return the removed disc to its owner
+                if (returnDisc != null)
+                {
+                    var originalDisc = Disc.FromSymbol(cell.Value);
+                    returnDisc(new OrdinaryDisc(originalDisc.Owner));
+                }
+                board.ClearCell(r, col);
+            }
+        }
+
+        // drop the Boring disc to the bottom of the column
+        board.CollapseColumn(col);
+    }
+}
+
+/// <summary>
+/// Magnetic disc: after placing, if there is a contiguous stack of own discs directly below, pull the top one up by one cell (swap with the cell above it)
+/// </summary>
+public class MagneticDisc : Disc
+{
+    public MagneticDisc(PlayerId owner) : base(owner, DiscType.Magnetic) { }
+
+    public override char Symbol => Owner == PlayerId.Player1 ? 'M' : 'm';
+
+    public override void ApplyEffect(Board board, int row, int col, Action<Disc>? returnDisc)
+    {
+        // from the cell bellow, find the first disc that belongs to the same player
+        int? targetRow = null;
+        for (int r = row + 1; r < board.Rows; r++)
+        {
+            char? cell = board.GetCell(r, col);
+            if (cell.HasValue)
+            {
+                var disc = Disc.FromSymbol(cell.Value);
+                if (disc.Owner == Owner)
+                {
+                    targetRow = r;
+                    break;
+                }
+            }
+        }
+
+        // if found, swap it up by one cell (simulate being pulled up by the magnetic disc)
+        if (targetRow.HasValue && targetRow.Value != row + 1)
+        {
+            char? targetSymbol = board.GetCell(targetRow.Value, col);
+            char? aboveSymbol = board.GetCell(targetRow.Value - 1, col);
+            board.SetCell(targetRow.Value - 1, col, targetSymbol);
+            board.SetCell(targetRow.Value, col, aboveSymbol);
+        }
     }
 }

@@ -1,142 +1,144 @@
 namespace Lineup.Model;
 
-public enum PlayerType
+// type
+public enum PlayerType { Human, Computer }
+
+// options
+public enum TurnAction { Move, Save, Quit }
+
+
+public class TurnResult
 {
-    Human,
-    Computer
+    public TurnAction Action { get; set; }
+    public DiscType DiscType { get; set; }
+    public int Column { get; set; } // 0-based
 }
 
-public class Player
+/// <summary>
+/// player class - stores info and inventory, and TakeTurn() method.
+/// </summary>
+public abstract class Player
 {
+    private int _ordinaryDiscs;
+    private int _boringDiscs;
+    private int _magneticDiscs;
+
     public PlayerId Id { get; }
-    public PlayerType Type { get; }
     public string Name { get; }
+    public PlayerType Type { get; }
 
-    public int OrdinaryDiscsRemaining { get; private set; }
-    public int BoringDiscsRemaining { get; private set; }
-    public int MagneticDiscsRemaining { get; private set; }
-    public int ExplodingDiscsRemaining { get; private set; }
+    // 公开只读属性暴露库存数量
+    public int OrdinaryDiscsRemaining => _ordinaryDiscs;
+    public int BoringDiscsRemaining => _boringDiscs;
+    public int MagneticDiscsRemaining => _magneticDiscs;
 
-    public Player(
-        PlayerId id,
-        PlayerType type,
-        string name,
-        int ordinaryDiscCount,
-        int boringDiscCount = 2,
-        int magneticDiscCount = 2,
-        int explodingDiscCount = 0)
+    protected Player(PlayerId id, PlayerType type, string name,
+        int ordinaryDiscs, int boringDiscs, int magneticDiscs)
     {
-        if (ordinaryDiscCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(ordinaryDiscCount), "Ordinary disc count cannot be negative.");
-        }
-
-        if (boringDiscCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(boringDiscCount), "Boring disc count cannot be negative.");
-        }
-
-        if (magneticDiscCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(magneticDiscCount), "Magnetic disc count cannot be negative.");
-        }
-
-        if (explodingDiscCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(explodingDiscCount), "Exploding disc count cannot be negative.");
-        }
+        if (ordinaryDiscs < 0 || boringDiscs < 0 || magneticDiscs < 0)
+            throw new ArgumentOutOfRangeException("Disc counts cannot be negative.");
 
         Id = id;
         Type = type;
         Name = name;
-        OrdinaryDiscsRemaining = ordinaryDiscCount;
-        BoringDiscsRemaining = boringDiscCount;
-        MagneticDiscsRemaining = magneticDiscCount;
-        ExplodingDiscsRemaining = explodingDiscCount;
+        _ordinaryDiscs = ordinaryDiscs;
+        _boringDiscs = boringDiscs;
+        _magneticDiscs = magneticDiscs;
     }
 
-    public bool IsComputer
+    /// check if the player can play this kind of disc
+    public bool CanPlayDisc(DiscType type)
     {
-        get
+        return type switch
         {
-            return Type == PlayerType.Computer;
-        }
-    } 
-
-    public bool CanPlayDisc(DiscType discType)
-    {
-        return discType switch
-        {
-            DiscType.Ordinary => OrdinaryDiscsRemaining > 0,
-            DiscType.Boring => BoringDiscsRemaining > 0,
-            DiscType.Magnetic => MagneticDiscsRemaining > 0,
-            DiscType.Exploding => ExplodingDiscsRemaining > 0,
+            DiscType.Ordinary => _ordinaryDiscs > 0,
+            DiscType.Boring => _boringDiscs > 0,
+            DiscType.Magnetic => _magneticDiscs > 0,
             _ => false
         };
     }
 
-    public bool CanPlaySpecialDisc(DiscType discType)
+    /// use disc of the specified type, reduce inventory and return a Disc instance
+    public Disc UseDisc(DiscType type)
     {
-        return discType != DiscType.Ordinary && CanPlayDisc(discType);
-    }
+        if (!CanPlayDisc(type))
+            throw new InvalidOperationException($"{Name} has no {type} discs remaining.");
 
-    public Disc UseDisc(DiscType discType)
-    {
-        if (!CanPlayDisc(discType))
-        {
-            throw new InvalidOperationException($"{Name} cannot play {discType}.");
-        }
-
-        switch (discType)
+        switch (type)
         {
             case DiscType.Ordinary:
-                OrdinaryDiscsRemaining--;
-                break;
+                _ordinaryDiscs--;
+                return new OrdinaryDisc(Id);
             case DiscType.Boring:
-                BoringDiscsRemaining--;
-                break;
+                _boringDiscs--;
+                return new BoringDisc(Id);
             case DiscType.Magnetic:
-                MagneticDiscsRemaining--;
-                break;
-            case DiscType.Exploding:
-                ExplodingDiscsRemaining--;
-                break;
+                _magneticDiscs--;
+                return new MagneticDisc(Id);
+            default:
+                throw new ArgumentException($"Unknown disc type: {type}");
         }
-
-        return new Disc(Id, discType);
     }
 
-    public void UseSpecialDisc(DiscType discType)
-    {
-        if (discType == DiscType.Ordinary)
-        {
-            throw new InvalidOperationException("Ordinary disc is not a special disc.");
-        }
-
-        UseDisc(discType);
-    }
-
+    /// return disc to player, used for Boring disc effect
     public void ReturnDisc(Disc disc)
     {
         if (disc.Owner != Id)
+            throw new InvalidOperationException("Cannot return disc to wrong player.");
+
+        _ordinaryDiscs++;
+    }
+
+    
+    public abstract TurnResult TakeTurn(
+        Board board, GameConsoleUi ui, GameRules rules,
+        DiscType[] enabledSpecialTypes, Random random);
+}
+
+// human player - input from console
+public class HumanPlayer : Player
+{
+    public HumanPlayer(PlayerId id, string name,
+        int ordinaryDiscs, int boringDiscs, int magneticDiscs)
+        : base(id, PlayerType.Human, name, ordinaryDiscs, boringDiscs, magneticDiscs) { }
+
+    public override TurnResult TakeTurn(
+        Board board, GameConsoleUi ui, GameRules rules,
+        DiscType[] enabledSpecialTypes, Random random)
+    {
+        // 循环直到玩家输入有效走法或选择 save/quit
+        return ui.PromptHumanMove();
+    }
+}
+
+// computer player - simple AI: prioritize winning move, otherwise random valid move
+public class ComputerPlayer : Player
+{
+    public ComputerPlayer(PlayerId id, string name,
+        int ordinaryDiscs, int boringDiscs, int magneticDiscs)
+        : base(id, PlayerType.Computer, name, ordinaryDiscs, boringDiscs, magneticDiscs) { }
+
+    public override TurnResult TakeTurn(
+        Board board, GameConsoleUi ui, GameRules rules,
+        DiscType[] enabledSpecialTypes, Random random)
+    {
+        var validMoves = rules.GetValidMoves(board, this, enabledSpecialTypes);
+        if (validMoves.Count == 0)
+            return new TurnResult { Action = TurnAction.Quit };
+
+        // check if any move wins immediately, if so take it
+        foreach (var (discType, col) in validMoves)
         {
-            throw new InvalidOperationException($"{Name} cannot receive a disc owned by another player.");
+            if (rules.MoveWinsImmediately(board, this, discType, col))
+            {
+                ui.ShowComputerMove(Name, discType, col + 1);
+                return new TurnResult { Action = TurnAction.Move, DiscType = discType, Column = col };
+            }
         }
 
-        switch (disc.Type)
-        {
-            case DiscType.Ordinary:
-                OrdinaryDiscsRemaining++;
-                break;
-            case DiscType.Boring:
-                BoringDiscsRemaining++;
-                break;
-            case DiscType.Magnetic:
-                MagneticDiscsRemaining++;
-                break;
-            case DiscType.Exploding:
-                ExplodingDiscsRemaining++;
-                break;
-        }
+        // without winning move, pick a random valid move
+        var (randomType, randomCol) = validMoves[random.Next(validMoves.Count)];
+        ui.ShowComputerMove(Name, randomType, randomCol + 1);
+        return new TurnResult { Action = TurnAction.Move, DiscType = randomType, Column = randomCol };
     }
 }
