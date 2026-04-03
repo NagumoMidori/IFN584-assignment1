@@ -1,7 +1,7 @@
 namespace Lineup.Model;
 
 /// <summary>
-/// 测试模式 — 解析走法序列并在 6×7 棋盘上自动执行
+/// Test mode that parses a move sequence and executes it automatically on a 6x7 board.
 /// </summary>
 public class TestModeRunner
 {
@@ -12,18 +12,18 @@ public class TestModeRunner
         _ui = ui;
     }
 
-    /// <summary>运行测试模式</summary>
+    /// <summary>Runs test mode.</summary>
     public void Run(string sequence)
     {
         var moves = ParseSequence(sequence);
 
-        // 创建 6×7 游戏，两个 HumanPlayer（测试模式不需要 AI）
+        // Create a 6x7 game with two human players. Test mode does not need AI.
         var board = new Board(6, 7);
         int winningLength = 4;
         var rules = new GameRules(winningLength);
 
         int discsPerPlayer = 6 * 7 / 2; // = 21
-        int ordinaryCount = discsPerPlayer - 4; // 4 个特殊棋子（Boring×2 + Magnetic×2）
+        int ordinaryCount = discsPerPlayer - 4; // Four special discs total: Boring x2 and Magnetic x2.
 
         var player1 = new HumanPlayer(PlayerId.Player1, "Player 1", ordinaryCount, 2, 2);
         var player2 = new HumanPlayer(PlayerId.Player2, "Player 2", ordinaryCount, 2, 2);
@@ -35,10 +35,10 @@ public class TestModeRunner
 
         foreach (var (discType, col) in moves)
         {
-            // 显示当前玩家
+            // Show the current player.
             Console.WriteLine($"{currentPlayer.Name} plays {discType} in column {col + 1}.");
 
-            // 验证走法
+            // Validate the move.
             if (!rules.IsValidColumn(board, col))
                 throw new InvalidOperationException($"Invalid column: {col + 1}.");
             if (board.IsColumnFull(col))
@@ -46,16 +46,16 @@ public class TestModeRunner
             if (!currentPlayer.CanPlayDisc(discType))
                 throw new InvalidOperationException($"{currentPlayer.Name} has no {discType} discs remaining.");
 
-            // 扣减库存并落子
+            // Consume the disc and place it on the board.
             Disc disc = currentPlayer.UseDisc(discType);
             int landedRow = board.DropDisc(col, disc.Symbol);
 
-            // 特殊棋子分帧显示
+            // Render special-disc placement and effect as separate frames.
             if (discType != DiscType.Ordinary)
             {
-                _ui.ShowBoard(board); // 放置帧
+                _ui.ShowBoard(board); // Placement frame.
 
-                // 执行特殊效果
+                // Apply the special effect.
                 Action<Disc> returnDisc = d =>
                 {
                     if (d.Owner == PlayerId.Player1) player1.ReturnDisc(d);
@@ -70,30 +70,30 @@ public class TestModeRunner
                 _ui.ShowBoard(board);
             }
 
-            // 检查胜利
+            // Check for a win.
             if (rules.HasWinner(board, currentPlayer.Id))
             {
                 _ui.ShowWinner(board, currentPlayer);
                 return;
             }
 
-            // 检查平局
+            // Check for a draw.
             if (board.IsFull)
             {
                 _ui.ShowTie(board);
                 return;
             }
 
-            // 切换玩家
+            // Switch players.
             currentPlayer = currentPlayer == player1 ? player2 : player1;
         }
 
-        // 所有步骤完成但无胜负
+        // All moves were executed without a winner.
         Console.WriteLine("\nAll moves executed. No winner yet.");
         _ui.ShowBoard(board);
     }
 
-    /// <summary>解析走法序列字符串</summary>
+    /// <summary>Parses the move-sequence string.</summary>
     private List<(DiscType discType, int col)> ParseSequence(string sequence)
     {
         var moves = new List<(DiscType, int)>();
@@ -107,7 +107,7 @@ public class TestModeRunner
             if (token.Length < 2)
                 throw new ArgumentException($"Invalid move: '{token}'.");
 
-            // 第一个字符是棋子类型
+            // The first character indicates the disc type.
             DiscType discType = char.ToUpper(token[0]) switch
             {
                 'O' => DiscType.Ordinary,
@@ -116,7 +116,7 @@ public class TestModeRunner
                 _ => throw new ArgumentException($"Unknown disc type: '{token[0]}'.")
             };
 
-            // 剩余部分是列号（1-based）
+            // The remaining characters represent the 1-based column number.
             if (!int.TryParse(token[1..], out int col1based))
                 throw new ArgumentException($"Invalid column in move: '{token}'.");
 

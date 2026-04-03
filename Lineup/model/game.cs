@@ -1,8 +1,8 @@
 namespace Lineup.Model;
 
-/// <summary>
-/// 游戏主控类 — 持有棋盘、双方玩家、规则，负责游戏循环
-/// </summary>
+
+/// game class - main game loop, game state, and save/load methods.
+
 public class Game
 {
     private readonly Board _board;
@@ -26,9 +26,9 @@ public class Game
         _winningLength = Math.Max(4, rows * cols / 10);
         _rules = new GameRules(_winningLength);
 
-        // 计算每人棋子数
+        // calculate disc counts
         int discsPerPlayer = rows * cols / 2;
-        int specialCount = _enabledSpecialTypes.Length * 2; // 每种特殊棋子各2个
+        int specialCount = _enabledSpecialTypes.Length * 2; // each special disc type has 2 discs
         int ordinaryCount = discsPerPlayer - specialCount;
 
         _player1 = new HumanPlayer(PlayerId.Player1, "Player 1", ordinaryCount, 2, 2);
@@ -39,7 +39,7 @@ public class Game
         _currentPlayer = _player1;
     }
 
-    // 用于 Load Game 恢复状态的内部构造函数
+    // load game
     internal Game(Board board, Player player1, Player player2, GameRules rules,
         GameConsoleUi ui, DiscType[] enabledSpecialTypes, int winningLength, Player currentPlayer)
     {
@@ -54,7 +54,7 @@ public class Game
         _currentPlayer = currentPlayer;
     }
 
-    // 公开属性，存档时需要访问
+    // save game
     internal Board Board => _board;
     internal Player Player1 => _player1;
     internal Player Player2 => _player2;
@@ -62,42 +62,42 @@ public class Game
     internal int WinningLength => _winningLength;
     internal DiscType[] EnabledSpecialTypes => _enabledSpecialTypes;
 
-    /// <summary>运行游戏主循环</summary>
+    /// run the game
     public void Run()
     {
         _ui.ShowGameStart(_board, _winningLength);
         PlayGameLoop();
     }
 
-    /// <summary>游戏主循环</summary>
+    /// game loop, returns when game ends (win/tie) or player quits
     private void PlayGameLoop()
     {
         while (true)
         {
-            // 检查当前玩家是否有合法走法
+            // check if current player has valid move.
             if (!_rules.HasAnyValidMove(_board, _currentPlayer, _enabledSpecialTypes))
             {
                 _ui.ShowNoValidMoves(_currentPlayer.Name);
                 var opponent = GetOpponent();
                 if (!_rules.HasAnyValidMove(_board, opponent, _enabledSpecialTypes))
                 {
-                    // 双方都无合法走法 → 平局
+                    // tie if both players have no valid moves
                     _ui.ShowTie(_board);
                     return;
                 }
-                // 跳过当前玩家，轮到对方
+                // skip turn if current player has no valid moves but opponent can play
                 _currentPlayer = opponent;
                 continue;
             }
 
-            // 显示当前玩家回合信息（棋盘已在上一步或游戏开始时显示）
+            // show current player's turn (only for human, computer move will be shown in TakeTurn)
             if (_currentPlayer.Type == PlayerType.Human)
                 _ui.ShowPlayerTurn(_currentPlayer);
 
-            // 当前玩家执行回合
+            // current player takes turn
             var result = _currentPlayer.TakeTurn(_board, _ui, _rules, _enabledSpecialTypes, _random);
 
-            // 处理 Save / Quit
+            //  Save / Quit
             if (result.Action == TurnAction.Quit)
                 return;
 
@@ -108,36 +108,36 @@ public class Game
                 continue;
             }
 
-            // 执行走法（ExecuteMove 内统一负责显示棋盘）
+            // move
             if (!ExecuteMove(_currentPlayer, result.DiscType, result.Column))
-                continue; // 走法无效，重新提示
+                continue; // invalid move
 
-            // 检查胜利
+            // check win
             if (_rules.HasWinner(_board, _currentPlayer.Id))
             {
                 _ui.ShowWinner(_board, _currentPlayer);
                 return;
             }
 
-            // 检查棋盘满
+            // check tie
             if (_board.IsFull)
             {
                 _ui.ShowTie(_board);
                 return;
             }
 
-            // 切换玩家
+            // switch player
             _currentPlayer = GetOpponent();
         }
     }
 
-    /// <summary>
-    /// 执行一步走法：落子 + 特殊效果 + 分帧显示
-    /// 返回 true 表示成功
-    /// </summary>
+
+    /// execute a move, return false if move is invalid (e.g. column full), otherwise perform the move and return true.
+    /// return true
+
     internal bool ExecuteMove(Player player, DiscType discType, int col)
     {
-        // 验证
+        // verify move
         if (!_rules.IsValidColumn(_board, col))
         {
             _ui.ShowInvalidColumn(_board.Columns);
@@ -154,15 +154,15 @@ public class Game
             return false;
         }
 
-        // 扣减库存并获取棋子
+        // get disc
         Disc disc = player.UseDisc(discType);
 
-        // 落子
+        // put disc
         int landedRow = _board.DropDisc(col, disc.Symbol);
 
         if (discType != DiscType.Ordinary)
         {
-            // 特殊棋子分帧显示：放置帧 → 效果帧
+            // spcial disc: show effect frame after applying effect
             _ui.ShowPlacementFrame($"{discType} disc", col + 1);
             _ui.ShowBoard(_board);
 
@@ -172,14 +172,14 @@ public class Game
         }
         else
         {
-            // 普通棋子：显示落子后棋盘
+            // normal disc: just show the board after placement
             _ui.ShowBoard(_board);
         }
 
         return true;
     }
 
-    /// <summary>归还棋子给对应玩家（Boring 效果回调）</summary>
+    /// return disc to owner
     private void ReturnDiscToOwner(Disc disc)
     {
         if (disc.Owner == PlayerId.Player1)
@@ -193,25 +193,25 @@ public class Game
         return _currentPlayer == _player1 ? _player2 : _player1;
     }
 
-    // ==================== 存档 / 读档 ====================
+    // ===================== save and load ====================
 
-    /// <summary>保存游戏状态到文本文件</summary>
+    /// save game state to a text file
     public void SaveGame(string filePath)
     {
         using var writer = new StreamWriter(filePath);
-        // 行1: 棋盘尺寸
+        // row1: board size
         writer.WriteLine($"{_board.Rows},{_board.Columns}");
-        // 行2: 胜利连线长度
+        // row2: winning length
         writer.WriteLine(_winningLength);
-        // 行3: Player2 类型
+        // row3: Player2 type
         writer.WriteLine(_player2.Type);
-        // 行4: 当前玩家 (1 or 2)
+        // row4: current player (1 or 2)
         writer.WriteLine(_currentPlayer == _player1 ? 1 : 2);
-        // 行5: P1 库存
+        // row5: P1 inventory
         writer.WriteLine($"{_player1.OrdinaryDiscsRemaining},{_player1.BoringDiscsRemaining},{_player1.MagneticDiscsRemaining}");
-        // 行6: P2 库存
+        // row6: P2 inventory
         writer.WriteLine($"{_player2.OrdinaryDiscsRemaining},{_player2.BoringDiscsRemaining},{_player2.MagneticDiscsRemaining}");
-        // 行7+: 棋盘内容，每行一行，空位用 .
+        // row7+: board content, one row per line, empty cells represented by .
         for (int row = 0; row < _board.Rows; row++)
         {
             var line = "";
@@ -224,7 +224,7 @@ public class Game
         }
     }
 
-    /// <summary>从文本文件加载游戏状态</summary>
+    /// load game state from a text file, throws exception if file is invalid or not found
     public static Game LoadGame(string filePath, GameConsoleUi ui)
     {
         if (!File.Exists(filePath))
@@ -233,33 +233,33 @@ public class Game
         var lines = File.ReadAllLines(filePath);
         int lineIndex = 0;
 
-        // 行1: 棋盘尺寸
+        // row1: board size
         var sizeParts = lines[lineIndex++].Split(',');
         int rows = int.Parse(sizeParts[0]);
         int cols = int.Parse(sizeParts[1]);
 
-        // 行2: 胜利连线长度
+        // row2: winning length
         int winningLength = int.Parse(lines[lineIndex++]);
 
-        // 行3: Player2 类型
+        // row3: Player2 type
         var player2Type = Enum.Parse<PlayerType>(lines[lineIndex++]);
 
-        // 行4: 当前玩家
+        // row4: current player
         int currentPlayerNum = int.Parse(lines[lineIndex++]);
 
-        // 行5: P1 库存
+        // row5: P1 inventory
         var p1Parts = lines[lineIndex++].Split(',');
         int p1Ordinary = int.Parse(p1Parts[0]);
         int p1Boring = int.Parse(p1Parts[1]);
         int p1Magnetic = int.Parse(p1Parts[2]);
 
-        // 行6: P2 库存
+        // row6: P2 inventory
         var p2Parts = lines[lineIndex++].Split(',');
         int p2Ordinary = int.Parse(p2Parts[0]);
         int p2Boring = int.Parse(p2Parts[1]);
         int p2Magnetic = int.Parse(p2Parts[2]);
 
-        // 重建棋盘
+        // rebuild board
         var board = new Board(rows, cols);
         for (int row = 0; row < rows; row++)
         {
@@ -271,7 +271,7 @@ public class Game
             }
         }
 
-        // 重建玩家
+        // rebuild players and game
         var player1 = new HumanPlayer(PlayerId.Player1, "Player 1", p1Ordinary, p1Boring, p1Magnetic);
         Player player2 = player2Type == PlayerType.Computer
             ? new ComputerPlayer(PlayerId.Player2, "Computer", p2Ordinary, p2Boring, p2Magnetic)

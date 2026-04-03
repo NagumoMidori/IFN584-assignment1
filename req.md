@@ -26,7 +26,6 @@
 
 In this task you will complete an object-oriented programming exercise based on a simple design in order to reinforce your object-oriented programming knowledge and prepare you for the larger design-and-implementation task in the next assignment.
 
-The submission must be your own original work. Plagiarising the work of others is strictly prohibited at QUT, and submissions will be checked for code plagiarism. Furthermore, using generative AI tools like ChatGPT, including programming/coding assistants like CoPilot, is forbidden for all assessment tasks in IFN584. Any such use will be considered an act of academic misconduct.
 
 This assignment is eligible for the 48-hour late submission period and assignment extensions.
 

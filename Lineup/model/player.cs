@@ -27,7 +27,7 @@ public abstract class Player
     public string Name { get; }
     public PlayerType Type { get; }
 
-    // 公开只读属性暴露库存数量
+    // Public read-only accessors for remaining disc counts.
     public int OrdinaryDiscsRemaining => _ordinaryDiscs;
     public int BoringDiscsRemaining => _boringDiscs;
     public int MagneticDiscsRemaining => _magneticDiscs;
@@ -106,7 +106,7 @@ public class HumanPlayer : Player
         Board board, GameConsoleUi ui, GameRules rules,
         DiscType[] enabledSpecialTypes, Random random)
     {
-        // 循环直到玩家输入有效走法或选择 save/quit
+        // loop until player inputs a valid move.
         return ui.PromptHumanMove();
     }
 }

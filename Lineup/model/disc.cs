@@ -28,7 +28,7 @@ public abstract class Disc
 
     /// <summary>
     /// the disc effect when placed on the board:
-    /// OrdinaryDisc 无效果，BoringDisc/MagneticDisc needs override to implement
+    /// OrdinaryDisc no effect, BoringDisc/MagneticDisc needs override to implement
     /// </summary>
     /// <param name="board">board</param>
     /// <param name="row">row</param>
